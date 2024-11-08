@@ -1,12 +1,40 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class UsersService {
-  findAll() {
-    return `This action returns all users`;
+  constructor(private prisma: PrismaService) {}
+
+  async findAll() {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        password: false,
+      },
+    });
+
+    return { count: users.length, users };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findOne(id: number) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        username: true,
+        password: false,
+      },
+    });
+
+    if (!user) {
+      return {
+        message: 'User not found',
+      };
+    }
+
+    return user;
   }
 }

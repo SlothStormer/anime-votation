@@ -1,26 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Post } from '@nestjs/common';
 import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { PrismaService } from 'src/prisma.service';
+import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
+
+  @Post('register')
+  async register(createAuthDto: CreateAuthDto) {
+    const hashedPassword = await bcrypt.hash(createAuthDto.password, 10);
+    await this.prisma.user.create({
+      data: {
+        username: createAuthDto.username,
+        password: hashedPassword,
+      },
+    });
+
+    return {
+      access_token: await this.jwtService.signAsync({
+        username: createAuthDto.username,
+      }),
+    };
   }
 
-  findAll() {
-    return `This action returns all auth`;
-  }
+  @Post('login')
+  async login(createAuthDto: CreateAuthDto) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        username: createAuthDto.username,
+      },
+    });
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
-  }
+    if (!user) {
+      return 'No user found';
+    }
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
+    const match = bcrypt.compare(createAuthDto.password, user.password);
 
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+    if (!match) {
+      return 'Wrong password';
+    }
+
+    const token = await this.jwtService.signAsync({
+      username: user.username,
+    });
+
+    return token;
   }
 }
